@@ -7,7 +7,6 @@ import ImageChat from './models/ImageChat.js';
 import User from './models/User.js';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import { Strategy as FacebookStrategy } from 'passport-facebook';
 import cookieParser from 'cookie-parser';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -20,14 +19,10 @@ import fetch from 'node-fetch';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import ffmpeg from 'fluent-ffmpeg';
+import Replicate from 'replicate';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
-import ffmpegPath from '@ffmpeg-installer/ffmpeg';
-import Replicate from "replicate";
-import crypto from 'crypto';
 import nodemailer from 'nodemailer';
-
 
 dotenv.config();
 
@@ -41,10 +36,8 @@ const storage = multer.diskStorage({
     cb(null, uniqueName);
   }
 });
-
 const upload = multer({ storage });
 
-// ========== ✅ FIXED CORS ==========
 app.use(cors({
   origin: [
     'http://localhost:5501',
@@ -56,13 +49,12 @@ app.use(cors({
 }));
 app.options('*', cors());
 
-// ========== Middleware ==========
 app.use(express.json());
 app.use(cookieParser());
 app.use(helmet());
 app.use(morgan('dev'));
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  secret: process.env.SESSION_SECRET || 'default-secret',
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -76,10 +68,8 @@ app.use(passport.initialize());
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ========== Database ==========
 connectDB();
 
-// ========== Passport ==========
 passport.serializeUser((user, done) => done(null, user._id));
 passport.deserializeUser(async (id, done) => {
   try {
@@ -90,7 +80,11 @@ passport.deserializeUser(async (id, done) => {
   }
 });
 
-// ========== Google OAuth Strategy ==========
+if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+  console.error("❌ Missing Google OAuth credentials in environment variables");
+  process.exit(1);
+}
+
 passport.use(
   new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
@@ -123,7 +117,6 @@ passport.use(
   })
 );
 
-// ========== Start Google OAuth ==========
 app.get('/auth/google', (req, res, next) => {
   const state = req.query.redirect || '/';
   const stateParam = generateStateParam(state);
@@ -134,7 +127,6 @@ app.get('/auth/google', (req, res, next) => {
   })(req, res, next);
 });
 
-// ========== Google OAuth Callback ==========
 app.get('/auth/google/callback',
   (req, res, next) => {
     try {
@@ -149,23 +141,24 @@ app.get('/auth/google/callback',
   passport.authenticate('google', { failureRedirect: `${process.env.FRONTEND_BASE_URL}/signin.html?error=auth_failed`, session: false }),
   async (req, res) => {
     const token = jwt.sign({
-  userId: req.user._id,
-  name: req.user.name,
-  email: req.user.email,
-  profilePicture: req.user.profilePicture,
-}, process.env.JWT_SECRET, { expiresIn: '30d' });
+      userId: req.user._id,
+      name: req.user.name,
+      email: req.user.email,
+      profilePicture: req.user.profilePicture,
+    }, process.env.JWT_SECRET, { expiresIn: '30d' });
+
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 30 * 24 * 60 * 60 * 1000
     });
+
     const redirectWithToken = `${process.env.FRONTEND_BASE_URL}/frontend/home.html?token=${token}`;
     res.redirect(redirectWithToken);
   }
 );
 
-// ✅ Improved /api/auth/verify
 app.get('/api/auth/verify', async (req, res) => {
   const authHeader = req.headers.authorization || req.cookies?.token;
   const token = authHeader?.startsWith('Bearer ')
@@ -176,8 +169,6 @@ app.get('/api/auth/verify', async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    // ✅ Get full user from DB
     const user = await User.findById(decoded.userId).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
 
@@ -187,7 +178,6 @@ app.get('/api/auth/verify', async (req, res) => {
   }
 });
 
-// ========== Signup ==========
 app.post('/signup', async (req, res) => {
   try {
     const { name, email, password, profilePicture } = req.body;
@@ -214,7 +204,6 @@ app.post('/signup', async (req, res) => {
   }
 });
 
-// ========== Signin ==========
 app.post('/signin', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -260,16 +249,11 @@ const transporter = nodemailer.createTransport({
 
 export async function sendPasswordResetEmail(email, token) {
   const resetLink = `${process.env.FRONTEND_BASE_URL}/reset-password.html?token=${token}`;
-
   const mailOptions = {
     from: `"EchoAI Support" <${process.env.EMAIL_USER}>`,
     to: email,
     subject: '🔐 EchoAI Password Reset',
-    html: `
-      <h3>Password Reset Requested</h3>
-      <p>Click <a href="${resetLink}">here</a> to reset your password.</p>
-      <p>This link is valid for 1 hour.</p>
-    `
+    html: `<h3>Password Reset Requested</h3><p>Click <a href="${resetLink}">here</a> to reset your password.</p><p>This link is valid for 1 hour.</p>`
   };
 
   try {
@@ -282,26 +266,14 @@ export async function sendPasswordResetEmail(email, token) {
   }
 }
 
-
-
-// POST /reset-password
 app.post('/reset-password', async (req, res) => {
   try {
     const { email, newPassword } = req.body;
-
-    if (!email || !newPassword) {
-      return res.status(400).json({ error: 'Email and new password required' });
-    }
-
-    if (newPassword.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
-    }
+    if (!email || !newPassword) return res.status(400).json({ error: 'Email and new password required' });
+    if (newPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
 
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ error: 'User not found' });
-
-    // Optional: Require verification
-    // if (!user.isVerified) return res.status(403).json({ error: 'Email not verified' });
 
     const hashed = await bcrypt.hash(newPassword, 10);
     user.password = hashed;
@@ -315,22 +287,15 @@ app.post('/reset-password', async (req, res) => {
   }
 });
 
-// ========== Signout ==========
 app.post('/signout', (req, res) => {
   res.clearCookie('token');
   res.status(200).json({ message: 'Logged out successfully' });
 });
 
-// === Chat Routes ===
-
-// Save Chat (text only)
 app.post("/chat", authMiddleware, async (req, res) => {
   const { prompt, response } = req.body;
   const userId = req.userId;
-
-  if (!prompt && !response) {
-    return res.status(400).json({ message: "Prompt or response required" });
-  }
+  if (!prompt && !response) return res.status(400).json({ message: "Prompt or response required" });
 
   try {
     const chat = new Chat({ userId, prompt, response });
@@ -341,25 +306,15 @@ app.post("/chat", authMiddleware, async (req, res) => {
   }
 });
 
-// Save Chat with File
 app.post("/chatWithFile", authMiddleware, upload.single("file"), async (req, res) => {
   const { prompt, response } = req.body;
   const userId = req.userId;
 
-  if (!prompt && !req.file) {
-    return res.status(400).json({ message: "Either prompt or file is required" });
-  }
+  if (!prompt && !req.file) return res.status(400).json({ message: "Either prompt or file is required" });
 
   try {
     const fileUrl = req.file ? `/uploads/${req.file.filename}` : null;
-
-    const chat = new Chat({
-      userId,
-      prompt,
-      response,
-      fileUrl
-    });
-
+    const chat = new Chat({ userId, prompt, response, fileUrl });
     await chat.save();
     res.status(201).json({ message: "Chat with file saved", chat });
   } catch (error) {
@@ -367,7 +322,6 @@ app.post("/chatWithFile", authMiddleware, upload.single("file"), async (req, res
   }
 });
 
-// Get All Chats for User
 app.get("/chathistory", authMiddleware, async (req, res) => {
   try {
     const chats = await Chat.find({ userId: req.userId }).sort({ timestamp: 1 });
@@ -377,7 +331,6 @@ app.get("/chathistory", authMiddleware, async (req, res) => {
   }
 });
 
-// Delete All Chats for User
 app.delete("/chatDelete", authMiddleware, async (req, res) => {
   try {
     await Chat.deleteMany({ userId: req.userId });
@@ -387,10 +340,10 @@ app.delete("/chatDelete", authMiddleware, async (req, res) => {
   }
 });
 
-// ========== Image Routes ==========
 app.post('/api/image', authMiddleware, async (req, res) => {
   const { prompt, imageBase64 } = req.body;
   if (!prompt || !imageBase64) return res.status(400).json({ error: 'Missing prompt or imageBase64' });
+
   const newImage = new ImageChat({ userId: req.userId, prompt, imageBase64, timestamp: new Date() });
   await newImage.save();
   res.status(200).json({ message: 'Image saved', imageBase64 });
@@ -401,7 +354,6 @@ app.get('/api/imagehistory', authMiddleware, async (req, res) => {
   res.status(200).json({ images });
 });
 
-// ========== Stable Horde ==========
 const STABLE_HORDE_API = "https://stablehorde.net/api/v2";
 
 app.post('/api/image/generate', authMiddleware, async (req, res) => {
@@ -446,7 +398,6 @@ app.post('/api/image/generate', authMiddleware, async (req, res) => {
     }
 
     if (!imageUrl) throw new Error('Timeout');
-
     const imageBuffer = await (await fetch(imageUrl)).arrayBuffer();
     const base64 = Buffer.from(imageBuffer).toString('base64');
 
@@ -461,7 +412,6 @@ app.post('/api/image/generate', authMiddleware, async (req, res) => {
   }
 });
 
-// Delete All Image Chats for User
 app.delete('/api/imageDelete', authMiddleware, async (req, res) => {
   try {
     await ImageChat.deleteMany({ userId: req.userId });
@@ -472,5 +422,4 @@ app.delete('/api/imageDelete', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== Start Server ==========
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
