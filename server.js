@@ -388,6 +388,43 @@ app.delete("/chatDelete", authMiddleware, async (req, res) => {
   }
 });
 
+app.post('/api/chat', async (req, res) => {
+  const { prompt } = req.body;
+
+  if (!prompt) return res.status(400).json({ error: "Prompt is required" });
+
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'HTTP-Referer': 'https://ishan11032005github.github.io' // Required by OpenRouter
+      },
+      body: JSON.stringify({
+        model: 'mistralai/mistral-7b-instruct', // or 'google/gemini-2.5-pro'
+        messages: [
+          { role: 'user', content: prompt }
+        ]
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("OpenRouter error:", data);
+      return res.status(response.status).json({ error: data?.error?.message || 'OpenRouter error' });
+    }
+
+    const aiResponse = data.choices?.[0]?.message?.content || 'No response received';
+    return res.status(200).json({ response: aiResponse });
+
+  } catch (error) {
+    console.error("❌ Error calling OpenRouter:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 app.post('/api/image', authMiddleware, async (req, res) => {
   const { prompt, imageBase64 } = req.body;
   if (!prompt || !imageBase64) return res.status(400).json({ error: 'Missing prompt or imageBase64' });
