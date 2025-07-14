@@ -42,8 +42,7 @@ const upload = multer({ storage });
 
 app.use(cors({
   origin: [
-    'http://localhost:5501',
-    'http://127.0.0.1:5501',
+    'https://ishan11032005github.github.io/EchoAI-frontend/',
     process.env.FRONTEND_BASE_URL
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
