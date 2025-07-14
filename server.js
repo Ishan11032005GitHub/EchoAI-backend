@@ -1,4 +1,5 @@
 import MongoStore from 'connect-mongo';
+import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDB from './Connection/connect.js';
