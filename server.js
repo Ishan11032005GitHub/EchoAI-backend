@@ -31,6 +31,15 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.set('trust proxy', 1); // Trust Railway/Heroku proxies
+
+app.use((req, res, next) => {
+  if (req.headers['x-forwarded-proto'] !== 'https') {
+    return res.redirect(301, `https://${req.headers.host}${req.url}`);
+  }
+  next();
+});
+
 const storage = multer.diskStorage({
   destination: "uploads/",
   filename: (req, file, cb) => {
