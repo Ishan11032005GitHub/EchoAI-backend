@@ -1,3 +1,4 @@
+import MongoStore from 'connect-mongo';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDB from './Connection/connect.js';
@@ -55,6 +56,11 @@ app.use(helmet());
 app.use(morgan('dev'));
 app.use(session({
   secret: process.env.SESSION_SECRET || 'default-secret',
+  store: MongoStore.create({
+    mongoUrl: process.env.MONGODB_URI,
+    ttl: 24 * 60 * 60, // 1 day
+    autoRemove: 'native' // Automatic cleanup
+  }),
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -64,6 +70,37 @@ app.use(session({
   }
 }));
 app.use(passport.initialize());
+
+mongoose.connection.on('connected', () => {
+  console.log('🟢 MongoDB connection established');
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.warn('🔴 MongoDB disconnected');
+});
+
+// Graceful Shutdown Handler
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received - closing server');
+  await mongoose.connection.close();
+  process.exit(0);
+});
+
+// Health Check Endpoint (for Railway monitoring)
+app.get('/health', (req, res) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? 'healthy' : 'unhealthy';
+  res.status(dbStatus === 'healthy' ? 200 : 503).json({
+    status: dbStatus,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Error Handling Middleware (add after all routes)
+app.use((err, req, res, next) => {
+  console.error('❌ Server Error:', err.stack);
+  res.status(500).json({ error: 'Internal Server Error' });
+});
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
