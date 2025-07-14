@@ -422,4 +422,15 @@ app.delete('/api/imageDelete', authMiddleware, async (req, res) => {
   }
 });
 
+app.get('/', (req, res) => {
+  res.json({
+    status: 'EchoAI Backend is Running',
+    routes: {
+      auth: '/auth/google',
+      api: '/api/...',
+      docs: 'https://your-docs-link.com'
+    }
+  });
+});
+
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
