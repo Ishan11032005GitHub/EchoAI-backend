@@ -388,7 +388,7 @@ app.delete("/chatDelete", authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat', authMiddleware, async (req, res) => {
   const { prompt } = req.body;
 
   if (!prompt) return res.status(400).json({ error: "Prompt is required" });
@@ -399,10 +399,10 @@ app.post('/api/chat', async (req, res) => {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'HTTP-Referer': 'https://ishan11032005github.github.io' // Required by OpenRouter
+        'HTTP-Referer': 'https://ishan11032005github.github.io'
       },
       body: JSON.stringify({
-        model: 'mistralai/mistral-7b-instruct', // or 'google/gemini-2.5-pro'
+        model: 'mistralai/mistral-7b-instruct',
         messages: [
           { role: 'user', content: prompt }
         ]
@@ -424,6 +424,7 @@ app.post('/api/chat', async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
 
 app.post('/api/image', authMiddleware, async (req, res) => {
   const { prompt, imageBase64 } = req.body;
