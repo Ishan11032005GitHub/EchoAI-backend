@@ -71,6 +71,13 @@ app.use(session({
 }));
 app.use(passport.initialize());
 
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+connectDB();
+
+
 mongoose.connection.on('connected', () => {
   console.log('🟢 MongoDB connection established');
 });
@@ -100,12 +107,6 @@ app.use((err, req, res, next) => {
   console.error('❌ Server Error:', err.stack);
   res.status(500).json({ error: 'Internal Server Error' });
 });
-
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-connectDB();
 
 passport.serializeUser((user, done) => done(null, user._id));
 passport.deserializeUser(async (id, done) => {
