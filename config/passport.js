@@ -23,7 +23,7 @@ passport.use(new GoogleStrategy(
   {
     clientID: GOOGLE_CLIENT_ID,
     clientSecret: GOOGLE_CLIENT_SECRET,
-    callbackURL: `${BACKEND_BASE_URL}/auth/google/callback`,
+    callbackURL: "https://ishan11032005github.github.io/EchoAI-frontend/auth/google/callback",
   },
   async (accessToken, refreshToken, profile, done) => {
     try {
