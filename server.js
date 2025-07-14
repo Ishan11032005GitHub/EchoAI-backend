@@ -42,7 +42,8 @@ const upload = multer({ storage });
 
 app.use(cors({
   origin: [
-    'https://ishan11032005github.github.io/EchoAI-frontend/',
+    'https://ishan11032005github.github.io',
+    'https://ishan11032005github.github.io/EchoAI-frontend',
     process.env.FRONTEND_BASE_URL
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -192,7 +193,7 @@ app.get('/auth/google/callback',
       maxAge: 30 * 24 * 60 * 60 * 1000
     });
 
-    const redirectWithToken = `${process.env.FRONTEND_BASE_URL}/frontend/home.html?token=${token}`;
+    const redirectWithToken = `${process.env.FRONTEND_BASE_URL}/home.html?token=${token}`;
     res.redirect(redirectWithToken);
   }
 );
