@@ -204,10 +204,10 @@ app.get('/auth/google/callback',
     });
 
     const redirectWithToken = `${process.env.FRONTEND_BASE_URL}/home.html?token=${token}&user=${encodeURIComponent(JSON.stringify({
-  id: user._id,
-  name: user.name,
-  email: user.email,
-  profilePicture: user.profilePicture
+  id: req.user._id,
+  name: req.user.name,
+  email: req.user.email,
+  profilePicture: req.user.profilePicture
 }))}`;
     res.redirect(redirectWithToken);
   }
