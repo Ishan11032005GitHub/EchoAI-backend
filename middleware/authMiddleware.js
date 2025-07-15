@@ -1,3 +1,5 @@
+import jwt from 'jsonwebtoken';
+
 const authMiddleware = (req, res, next) => {
   console.log("🔐 Incoming Auth Header:", req.headers.authorization); // 👈 ADD THIS LINE
 
@@ -13,3 +15,5 @@ const authMiddleware = (req, res, next) => {
     return res.status(403).json({ message: 'Invalid token' });
   }
 };
+
+export default authMiddleware;
