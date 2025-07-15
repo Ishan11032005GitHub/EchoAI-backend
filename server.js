@@ -203,7 +203,12 @@ app.get('/auth/google/callback',
       maxAge: 30 * 24 * 60 * 60 * 1000
     });
 
-    const redirectWithToken = `${process.env.FRONTEND_BASE_URL}/home.html?token=${token}`;
+    const redirectWithToken = `${process.env.FRONTEND_BASE_URL}/home.html?token=${token}&user=${encodeURIComponent(JSON.stringify({
+  id: user._id,
+  name: user.name,
+  email: user.email,
+  profilePicture: user.profilePicture
+}))}`;
     res.redirect(redirectWithToken);
   }
 );
